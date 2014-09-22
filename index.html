@@ -1,7 +1,198 @@
-<!DOCTYPE=html>
+<!DOCTYPE html>
+<html>
 <head>
-<title>My page</title>
+  <meta charset="UTF-8">
+  <title>My page</title>
 </head>
 <body>
-under construction!
+  <canvas id="gameOfLife" width="210px" height="210px"></canvas>
+  <script>
+  var Cell = function(x,y,alive) {
+      this.x = parseInt(x);
+      this.y = parseInt(y);
+      this.alive = alive;
+      this.nextAlive = alive;
+      this.neighbours = [];
+  }
+  Cell.prototype = {
+      constructor: Cell,
+
+      addNeighbour: function(neighbour) {
+          this.neighbours.push(neighbour);
+      },
+
+      countLiveNeighbours: function() {
+          var count = 0;
+          for(var i in this.neighbours) {
+              if (this.neighbours[i].alive) {
+                  count++;
+              }
+          }
+          return count;
+      },
+
+      liveOrDie: function() {
+          var countLiveNeighbours = this.countLiveNeighbours();
+          switch (true){
+              case (countLiveNeighbours < 2 || countLiveNeighbours > 3) :
+                  this.nextAlive = 0;
+                  break;
+              case (countLiveNeighbours == 3) :
+                  this.nextAlive = 1;
+                  break;
+          }
+      },
+
+      resetCell: function()  {
+          this.alive = this.nextAlive;
+      }
+  }
+
+  var World = function(startMatrix, sizeX, sizeY, context, pixelHeight, pixelWidth) {
+      this.sizeX = sizeX;
+      this.sizeY = sizeY;
+      this.cells = [];
+      this.context = context;
+      this.pixelHeight = pixelHeight;
+      this.pixelWidth  = pixelWidth;
+      this.pieceHeight = Math.floor(pixelHeight/sizeY);
+      this.pieceWidth  = Math.floor(pixelWidth/sizeX);
+
+
+      for(var row in startMatrix) {
+          for(var col in startMatrix[row]) {
+              this.cells.push(new Cell(col, row, startMatrix[row][col]));
+          }
+      }
+      //add neighbours
+      for(var num in this.cells) {
+          var neighbours = this.getNeighbourCells(this.cells[num].x, this.cells[num].y);
+          for(var i in neighbours)
+          {
+              this.cells[num].addNeighbour(this.cells[neighbours[i]]);
+          }
+      }
+  }
+  World.prototype = {
+      constructor: World,
+
+      getCellIdByCoords: function(x, y) {
+         return this.sizeX * y + x;
+      },
+
+      getNeighbourCells: function(x, y) {
+          var maxX = this.sizeX - 1;
+          var maxY = this.sizeY - 1;
+          var neighbourCells = [];
+          for(var i=-1; i<=1; i++) {
+              for(var j=-1; j<=1; j++) {
+                  if(i==0 && j==0) {
+                      continue;
+                  }
+                  xNew = x+i;
+                  yNew = y+j;
+                  if(xNew > maxX) {
+                      xNew = 0;
+                  } else if (xNew < 0) {
+                      xNew = maxX;
+                  }
+                  if(yNew > maxY) {
+                      yNew = 0;
+                  } else if (yNew < 0) {
+                      yNew = maxY;
+                  }
+                  neighbourCells.push(this.getCellIdByCoords(xNew,yNew));
+              }
+          }
+          return neighbourCells;
+      },
+
+      drawCell: function(cell) {
+          var x = cell.x;
+          var y = cell.y;
+          var alive = cell.alive;
+          var drawX = (x * this.pieceWidth) + (this.pieceWidth/2);
+          var drawY = (y * this.pieceHeight) + (this.pieceHeight/2);
+          var radius = (this.pieceWidth/2) - (this.pieceWidth/5);
+          if (!alive) {
+              radius = radius + this.pieceWidth/10
+          }
+          this.context.beginPath();
+          this.context.arc(drawX, drawY, radius, 0, Math.PI*2, false);
+          this.context.closePath();
+          if (alive) {
+              this.context.strokeStyle = "#000";
+              this.context.stroke();
+          } else {
+              this.context.strokeStyle = "#fff";
+              this.context.stroke();
+          }
+          this.context.fillStyle = "#fff";
+          this.context.fill();
+      },
+
+      drawField: function() {
+          this.context.clearRect(0, 0, this.pixelWidth, this.pixelHeight);
+          this.context.beginPath();
+          /* vertical lines */
+          for (var x = 0; x <= this.pixelWidth; x += this.pieceWidth) {
+	          this.context.moveTo(0.5 + x, 0);
+	          this.context.lineTo(0.5 + x, this.pixelHeight);
+          }
+          /* horizontal lines */
+          for (var y = 0; y <= this.pixelHeight; y += this.pieceHeight) {
+	          this.context.moveTo(0, 0.5 + y);
+	          this.context.lineTo(this.pixelWidth, 0.5 +  y);
+          }
+          /* draw it! */
+          this.context.strokeStyle = "#ccc";
+          this.context.stroke();
+      },
+
+      redrawCells: function() {
+          for(i in this.cells) {
+              this.drawCell(this.cells[i]);
+              this.cells[i].liveOrDie();
+          }
+          for(i in this.cells) {
+              this.cells[i].resetCell();
+          }
+      }
+  }
+
+  var canvas = document.getElementById('gameOfLife');
+  var context = canvas.getContext('2d');
+  var startMatrix =
+  [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ];
+  var world = new World(startMatrix, 16, 16, context, 208, 208);
+  var generation = 0;
+  world.drawField();
+  action = function() {
+      if (generation < 1000) {
+          world.redrawCells();
+          generation++;
+          setTimeout(action, 1000);
+      }
+  };
+  setTimeout(action, 1000);
+  //console.log(world);
+  </script>
 </body>
+</html>
